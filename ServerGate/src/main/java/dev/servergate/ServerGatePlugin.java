@@ -4,12 +4,14 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.title.Title;
 import org.bukkit.Bukkit;
+import org.bukkit.NamespacedKey;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
@@ -31,7 +33,7 @@ public final class ServerGatePlugin extends JavaPlugin {
     private final Set<UUID> locked = ConcurrentHashMap.newKeySet();
     private final Map<UUID, Long> lockedAt = new ConcurrentHashMap<>();
     private final Map<UUID, Component> pendingJoin = new ConcurrentHashMap<>();
-    private final Set<UUID> blindApplied = ConcurrentHashMap.newKeySet();
+    private NamespacedKey markKey;
     private final Set<UUID> verifying = ConcurrentHashMap.newKeySet();
     private final AttemptTracker tracker = new AttemptTracker();
 
@@ -46,6 +48,7 @@ public final class ServerGatePlugin extends JavaPlugin {
 
     @Override
     public void onEnable() {
+        markKey = new NamespacedKey(this, "locked");
         saveDefaultConfig();
         loadSettings();
 
@@ -213,12 +216,12 @@ public final class ServerGatePlugin extends JavaPlugin {
         locked.add(id);
         lockedAt.put(id, System.currentTimeMillis());
 
-        // Скрываем мир. Снимаем эффект только если наложили его сами (совместимость с AuthMe).
-        if (!p.hasPotionEffect(PotionEffectType.BLINDNESS)) {
-            blindApplied.add(id);
-            p.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS,
-                    PotionEffect.INFINITE_DURATION, 0, false, false, false));
-        }
+        // Скрываем мир. Метим игрока, чтобы эффект гарантированно снялся потом
+        // (даже если игрока кикнуло и слепота сохранилась в его данных).
+        p.getPersistentDataContainer().set(markKey, PersistentDataType.BYTE, (byte) 1);
+        p.removePotionEffect(PotionEffectType.BLINDNESS);
+        p.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS,
+                PotionEffect.INFINITE_DURATION, 0, false, false, false));
 
         // Взаимная невидимость: заблокированный не видит других, другие не видят его.
         for (Player o : Bukkit.getOnlinePlayers()) {
@@ -243,7 +246,7 @@ public final class ServerGatePlugin extends JavaPlugin {
         lockedAt.remove(id);
         verifying.remove(id);
 
-        if (blindApplied.remove(id)) p.removePotionEffect(PotionEffectType.BLINDNESS);
+        clearMark(p);
         p.clearTitle();
         p.sendActionBar(Component.empty());
         p.updateCommands(); // вернёт полный список команд
@@ -268,8 +271,15 @@ public final class ServerGatePlugin extends JavaPlugin {
         locked.remove(id);
         lockedAt.remove(id);
         pendingJoin.remove(id);
-        blindApplied.remove(id);
         verifying.remove(id);
+    }
+
+    /** Снимает нашу слепоту и метку (в т.ч. «залипшую» с прошлого сеанса). */
+    public void clearMark(Player p) {
+        if (p.getPersistentDataContainer().has(markKey, PersistentDataType.BYTE)) {
+            p.removePotionEffect(PotionEffectType.BLINDNESS);
+            p.getPersistentDataContainer().remove(markKey);
+        }
     }
 
     // ------------------------------------------------------------------ проверка пароля
