@@ -77,6 +77,7 @@ public final class GateListener implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onJoin(PlayerJoinEvent e) {
         Player p = e.getPlayer();
+        plugin.clearMark(p); // убрать слепоту, оставшуюся с прошлого сеанса
         if (plugin.isBypass(p)) return;
         // Сообщение о входе покажем остальным только после ввода пароля.
         plugin.rememberJoinMessage(p, e.joinMessage());
@@ -87,7 +88,10 @@ public final class GateListener implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onQuit(PlayerQuitEvent e) {
         Player p = e.getPlayer();
-        if (plugin.isLocked(p)) e.quitMessage(null);
+        if (plugin.isLocked(p)) {
+            e.quitMessage(null);
+            plugin.clearMark(p); // чтобы слепота не сохранилась в данных игрока
+        }
         plugin.cleanup(p.getUniqueId());
     }
 
