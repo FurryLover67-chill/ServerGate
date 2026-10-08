@@ -13,7 +13,8 @@ jobs:
           distribution: temurin
           java-version: '21'
       - run: mvn -B clean package
+        working-directory: ServerGate
       - uses: actions/upload-artifact@v4
         with:
           name: ServerGate
-          path: target/ServerGate-*.jar
+          path: ServerGate/target/ServerGate-*.jar
