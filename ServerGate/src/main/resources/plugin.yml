@@ -1,0 +1,25 @@
+name: ServerGate
+version: 1.1.0
+main: dev.servergate.ServerGatePlugin
+api-version: '1.21'
+description: Общий пароль для входа на сервер (совместим с AuthMe)
+softdepend: [AuthMe]
+
+commands:
+  gate:
+    description: Ввести общий пароль сервера
+    usage: /gate <пароль>
+    aliases: [gpass]
+  servergate:
+    description: Управление ServerGate
+    usage: /servergate <reload|setpassword>
+    aliases: [sg]
+    permission: servergate.admin
+
+permissions:
+  servergate.admin:
+    description: Управление плагином
+    default: op
+  servergate.bypass:
+    description: Вход без общего пароля
+    default: false
